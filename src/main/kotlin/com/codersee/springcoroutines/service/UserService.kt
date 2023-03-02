@@ -34,7 +34,7 @@ class UserService(
             userRepository.deleteById(id)
     }
 
-    suspend fun updateUser(id: Long, requestedUser: User): User? {
+    suspend fun updateUser(id: Long, requestedUser: User): User {
         val foundUser = userRepository.findById(id)
 
         return if (foundUser == null)

@@ -74,15 +74,11 @@ class CompanyController(
             id = id,
             requestedCompany = companyRequest.toModel()
         )
-            ?.let { company ->
+            .let { company ->
                 company.toResponse(
                     users = findCompanyUsers(company)
                 )
             }
-            ?: throw ResponseStatusException(
-                HttpStatus.INTERNAL_SERVER_ERROR,
-                "Unexpected error during company update."
-            )
 
     private suspend fun findCompanyUsers(company: Company) =
         userService.findUsersByCompanyId(company.id!!)

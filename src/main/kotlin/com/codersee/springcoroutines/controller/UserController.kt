@@ -58,8 +58,7 @@ class UserController(
             id = id,
             requestedUser = userRequest.toModel()
         )
-            ?.let(User::toResponse)
-            ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error during user update.")
+            .toResponse()
 }
 
 private fun UserRequest.toModel(): User =

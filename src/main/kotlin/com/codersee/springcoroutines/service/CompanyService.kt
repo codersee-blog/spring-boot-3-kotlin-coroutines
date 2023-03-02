@@ -4,10 +4,10 @@ import com.codersee.springcoroutines.model.Company
 import com.codersee.springcoroutines.repository.CompanyRepository
 import kotlinx.coroutines.flow.Flow
 import org.springframework.http.HttpStatus
-import org.springframework.stereotype.Component
+import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 
-@Component
+@Service
 class CompanyService(
     private val companyRepository: CompanyRepository
 ) {
@@ -33,7 +33,7 @@ class CompanyService(
     suspend fun findAllCompaniesByNameLike(name: String): Flow<Company> =
         companyRepository.findByNameContaining(name)
 
-    suspend fun updateCompany(id: Long, requestedCompany: Company): Company? {
+    suspend fun updateCompany(id: Long, requestedCompany: Company): Company {
         val foundCompany = companyRepository.findById(id)
 
         return if (foundCompany == null)
