@@ -1,4 +1,4 @@
-package com.codersee.springcoroutines.controller
+package com.codersee.springcoroutines.handler
 
 import com.codersee.springcoroutines.dto.CompanyRequest
 import com.codersee.springcoroutines.dto.CompanyResponse
@@ -6,23 +6,23 @@ import com.codersee.springcoroutines.model.Company
 import com.codersee.springcoroutines.model.User
 import com.codersee.springcoroutines.service.CompanyService
 import com.codersee.springcoroutines.service.UserService
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.toList
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.*
+import org.springframework.stereotype.Component
+import org.springframework.web.reactive.function.server.*
 import org.springframework.web.server.ResponseStatusException
 
-@RestController
-@RequestMapping("/api/companies")
-class CompanyController(
+@Component
+class CompanyHandler(
     private val companyService: CompanyService,
     private val userService: UserService
 ) {
 
-    @PostMapping
-    suspend fun createCompany(@RequestBody companyRequest: CompanyRequest): CompanyResponse =
-        companyService.saveCompany(
+    suspend fun createCompany(request: ServerRequest): ServerResponse {
+        val companyRequest = request.awaitBody(CompanyRequest::class)
+
+        val createdCompanyResponse = companyService.saveCompany(
             company = companyRequest.toModel()
         )
             ?.toResponse()
@@ -30,27 +30,35 @@ class CompanyController(
                 HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error during company creation."
             )
 
-    @GetMapping
+        return ServerResponse.ok()
+            .bodyValueAndAwait(createdCompanyResponse)
+    }
+
     suspend fun findCompany(
-        @RequestParam("name", required = false) name: String?
-    ): Flow<CompanyResponse> {
-        val companies = name?.let { companyService.findAllCompaniesByNameLike(name) }
+        request: ServerRequest
+    ): ServerResponse {
+        val companies = request.queryParamOrNull("name")
+            ?.let { name -> companyService.findAllCompaniesByNameLike(name) }
             ?: companyService.findAllCompanies()
 
-        return companies
+        val companiesResponses = companies
             .map { company ->
                 company.toResponse(
                     users = findCompanyUsers(company)
                 )
             }
+
+        return ServerResponse.ok()
+            .bodyAndAwait(companiesResponses)
     }
 
 
-    @GetMapping("/{id}")
     suspend fun findCompanyById(
-        @PathVariable id: Long
-    ): CompanyResponse =
-        companyService.findCompanyById(id)
+        request: ServerRequest
+    ): ServerResponse {
+        val id = request.pathVariable("id").toLong()
+
+        val companyResponse = companyService.findCompanyById(id)
             ?.let { company ->
                 company.toResponse(
                     users = findCompanyUsers(company)
@@ -58,19 +66,30 @@ class CompanyController(
             }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Company with id $id was not found.")
 
-    @DeleteMapping("/{id}")
-    suspend fun deleteCompanyById(
-        @PathVariable id: Long
-    ) {
-        companyService.deleteCompanyById(id)
+        return ServerResponse.ok()
+            .bodyValueAndAwait(companyResponse)
     }
 
-    @PutMapping("/{id}")
+
+    suspend fun deleteCompanyById(
+        request: ServerRequest
+    ): ServerResponse {
+        val id = request.pathVariable("id").toLong()
+
+        companyService.deleteCompanyById(id)
+
+        return ServerResponse.noContent()
+            .buildAndAwait()
+    }
+
     suspend fun updateCompany(
-        @PathVariable id: Long,
-        @RequestBody companyRequest: CompanyRequest
-    ): CompanyResponse =
-        companyService.updateCompany(
+        request: ServerRequest
+    ): ServerResponse {
+        val id = request.pathVariable("id").toLong()
+        val companyRequest = request.awaitBody(CompanyRequest::class)
+
+
+        val updatedCompanyResponse = companyService.updateCompany(
             id = id,
             requestedCompany = companyRequest.toModel()
         )
@@ -79,6 +98,10 @@ class CompanyController(
                     users = findCompanyUsers(company)
                 )
             }
+
+        return ServerResponse.ok()
+            .bodyValueAndAwait(updatedCompanyResponse)
+    }
 
     private suspend fun findCompanyUsers(company: Company) =
         userService.findUsersByCompanyId(company.id!!)

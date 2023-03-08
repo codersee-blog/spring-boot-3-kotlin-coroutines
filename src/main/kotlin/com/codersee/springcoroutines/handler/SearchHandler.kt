@@ -1,4 +1,4 @@
-package com.codersee.springcoroutines.controller
+package com.codersee.springcoroutines.handler
 
 import com.codersee.springcoroutines.dto.IdNameTypeResponse
 import com.codersee.springcoroutines.dto.ResultType
@@ -6,31 +6,37 @@ import com.codersee.springcoroutines.model.Company
 import com.codersee.springcoroutines.model.User
 import com.codersee.springcoroutines.service.CompanyService
 import com.codersee.springcoroutines.service.UserService
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.RestController
+import org.springframework.http.HttpStatus
+import org.springframework.stereotype.Component
+import org.springframework.web.reactive.function.server.ServerRequest
+import org.springframework.web.reactive.function.server.ServerResponse
+import org.springframework.web.reactive.function.server.bodyAndAwait
+import org.springframework.web.reactive.function.server.queryParamOrNull
+import org.springframework.web.server.ResponseStatusException
 
-@RestController
-@RequestMapping("/api/search")
-class SearchController(
+@Component
+class SearchHandler(
     private val userService: UserService,
     private val companyService: CompanyService
 ) {
 
-    @GetMapping
     suspend fun searchByNames(
-        @RequestParam(name = "query") query: String
-    ): Flow<IdNameTypeResponse> {
+        request: ServerRequest
+    ): ServerResponse {
+        val query = request.queryParamOrNull("name")
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+
         val usersFlow = userService.findAllUsersByNameLike(name = query)
             .map(User::toIdNameTypeResponse)
         val companiesFlow = companyService.findAllCompaniesByNameLike(name = query)
             .map(Company::toIdNameTypeResponse)
 
-        return merge(usersFlow, companiesFlow)
+        val mergedFlows = merge(usersFlow, companiesFlow)
+
+        return ServerResponse.ok()
+            .bodyAndAwait(mergedFlows)
     }
 }
 
